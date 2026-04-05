@@ -1,0 +1,273 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+
+const seriesCollection = await getCollection('series');
+const seriesBySlug = new Map(seriesCollection.map((item) => [item.data.slug, item.data.name]));
+
+const photos = (await getCollection('photos')).map((photo) => ({
+  slug: photo.data.slug,
+  title: photo.data.title,
+  series: photo.data.series,
+  seriesName: seriesBySlug.get(photo.data.series) ?? photo.data.series,
+  tags: photo.data.tags ?? [],
+  rating: photo.data.rating ?? null,
+  date: photo.data.date
+}));
+
+const rated = photos.filter((p) => typeof p.rating === 'number');
+const unrated = photos.filter((p) => typeof p.rating !== 'number');
+
+const avgRating = rated.length
+  ? rated.reduce((sum, p) => sum + Number(p.rating), 0) / rated.length
+  : 0;
+
+const topRated = rated
+  .slice()
+  .sort((a, b) => Number(b.rating) - Number(a.rating))
+  .slice(0, 10);
+
+const bySeries = [...new Set(photos.map((p) => p.series))]
+  .map((slug) => {
+    const items = photos.filter((p) => p.series === slug);
+    const ratedItems = items.filter((p) => typeof p.rating === 'number');
+    const average = ratedItems.length
+      ? ratedItems.reduce((sum, p) => sum + Number(p.rating), 0) / ratedItems.length
+      : null;
+
+    return {
+      slug,
+      name: seriesBySlug.get(slug) ?? slug,
+      total: items.length,
+      rated: ratedItems.length,
+      average
+    };
+  })
+  .sort((a, b) => b.total - a.total);
+
+const tagMap = new Map();
+for (const photo of photos) {
+  for (const tag of photo.tags) {
+    const key = tag.trim();
+    if (!key) continue;
+    tagMap.set(key, (tagMap.get(key) ?? 0) + 1);
+  }
+}
+
+const topTags = [...tagMap.entries()]
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 30);
+
+const clientPhotos = photos.map((p) => ({ slug: p.slug, title: p.title, series: p.seriesName }));
+---
+
+<Base title="Stats | Portfolio" description="Suivi éditorial et statistiques photo">
+  <section class="head">
+    <h1>Stats & suivi éditorial</h1>
+    <p>Vue interne: notes admin, couverture des séries, tags, et aperçu des votes locaux du navigateur.</p>
+  </section>
+
+  <section class="kpis">
+    <article>
+      <span>Total photos</span>
+      <strong>{photos.length}</strong>
+    </article>
+    <article>
+      <span>Photos notées</span>
+      <strong>{rated.length}</strong>
+    </article>
+    <article>
+      <span>Photos sans note</span>
+      <strong>{unrated.length}</strong>
+    </article>
+    <article>
+      <span>Note moyenne</span>
+      <strong>{rated.length ? avgRating.toFixed(2) : '—'}</strong>
+    </article>
+  </section>
+
+  <section class="grid-two">
+    <article class="panel">
+      <h2>Top notes internes</h2>
+      <ol>
+        {topRated.map((photo) => (
+          <li>
+            <a href={`/photo/${photo.slug}/`}>{photo.title}</a>
+            <span>{Number(photo.rating).toFixed(1)} / 5 · {photo.seriesName}</span>
+          </li>
+        ))}
+      </ol>
+    </article>
+
+    <article class="panel">
+      <h2>Stats par série</h2>
+      <ul>
+        {bySeries.map((row) => (
+          <li>
+            <strong>{row.name}</strong>
+            <span>
+              {row.total} photos · {row.rated} notées · moyenne {row.average ? row.average.toFixed(2) : '—'}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </article>
+  </section>
+
+  <section class="panel">
+    <h2>Tags les plus utilisés</h2>
+    <div class="tags">
+      {topTags.map(([tag, count]) => (
+        <span>#{tag} · {count}</span>
+      ))}
+    </div>
+  </section>
+
+  <section class="panel" id="local-votes" data-photos={JSON.stringify(clientPhotos)}>
+    <h2>Votes locaux (ce navigateur)</h2>
+    <p id="local-summary">Chargement…</p>
+    <ol id="local-top"></ol>
+  </section>
+</Base>
+
+<style>
+  .head {
+    display: grid;
+    gap: 0.55rem;
+    margin-bottom: 1rem;
+  }
+
+  .head h1,
+  .head p {
+    margin: 0;
+  }
+
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+  }
+
+  .kpis article {
+    border: 1px solid var(--line);
+    background: rgba(10, 22, 48, 0.86);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .kpis span {
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  .kpis strong {
+    font-size: 1.35rem;
+  }
+
+  .grid-two {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .panel {
+    border: 1px solid var(--line);
+    background: rgba(10, 22, 48, 0.86);
+    border-radius: 0.75rem;
+    padding: 0.85rem;
+  }
+
+  .panel h2 {
+    margin: 0 0 0.7rem;
+    font-size: 1rem;
+  }
+
+  .panel ol,
+  .panel ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .panel li {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .panel li span {
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .tags span {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    padding: 0.18rem 0.55rem;
+    font-size: 0.8rem;
+    color: #cfdeff;
+  }
+
+  @media (max-width: 980px) {
+    .kpis {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid-two {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 620px) {
+    .kpis {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script is:inline>
+  const root = document.querySelector('#local-votes');
+  const summary = document.querySelector('#local-summary');
+  const top = document.querySelector('#local-top');
+
+  const renderLocalVotes = () => {
+    if (!root || !window.PhotoVotes || !summary || !top) return;
+    const photos = JSON.parse(root.dataset.photos || '[]');
+
+    const scored = photos
+      .map((p) => ({ ...p, votes: Number(window.PhotoVotes.getScore(p.slug) || 0) }))
+      .sort((a, b) => b.votes - a.votes || a.title.localeCompare(b.title, 'fr'));
+
+    const total = scored.reduce((sum, p) => sum + p.votes, 0);
+    const voters = scored.filter((p) => p.votes > 0).length;
+
+    summary.textContent = `${total} vote(s) enregistrés localement sur ${voters} photo(s).`;
+    top.innerHTML = '';
+
+    scored.filter((p) => p.votes > 0).slice(0, 10).forEach((p) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<a href="/photo/${p.slug}/">${p.title}</a> <span>${p.votes} vote(s) · ${p.series}</span>`;
+      top.appendChild(li);
+    });
+
+    if (!top.children.length) {
+      const li = document.createElement('li');
+      li.textContent = 'Aucun vote local pour le moment.';
+      top.appendChild(li);
+    }
+  };
+
+  window.addEventListener('photo-votes:changed', renderLocalVotes);
+  document.addEventListener('DOMContentLoaded', renderLocalVotes);
+  renderLocalVotes();
+</script>

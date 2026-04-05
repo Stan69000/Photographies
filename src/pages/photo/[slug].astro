@@ -1,0 +1,414 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+
+export async function getStaticPaths() {
+  const photos = await getCollection('photos');
+  const sorted = photos.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+  return sorted.map((photo, index) => ({
+    params: { slug: photo.data.slug },
+    props: {
+      photo,
+      prev: sorted[index - 1] ?? null,
+      next: sorted[index + 1] ?? null
+    }
+  }));
+}
+
+const { photo, prev, next } = Astro.props;
+
+const exif = photo.data.exif;
+const exifFields = exif
+  ? [
+      exif.camera && { label: 'Boîtier', value: exif.camera },
+      exif.lens   && { label: 'Objectif', value: exif.lens },
+      exif.settings && { label: 'Réglages', value: exif.settings },
+      exif.iso    && { label: 'ISO', value: String(exif.iso) }
+    ].filter(Boolean)
+  : [];
+---
+
+<Base title={`${photo.data.title} | Portfolio`} description={photo.data.description}>
+  <article class="photo-detail">
+
+    <div class="image-frame">
+      <img
+        src={photo.data.url}
+        alt={photo.data.title}
+        style={`view-transition-name: photo-${photo.data.slug};`}
+      />
+    </div>
+
+    <div class="detail-body">
+
+      <nav class="breadcrumb">
+        <a href="/photos">← Photos</a>
+        {photo.data.series && (
+          <>
+            <span>·</span>
+            <a href={`/series/${photo.data.series}/`}>{photo.data.series.replace(/-/g, ' ')}</a>
+          </>
+        )}
+      </nav>
+
+      <header class="detail-header">
+        <h1>{photo.data.title}</h1>
+        {photo.data.description && <p class="description">{photo.data.description}</p>}
+      </header>
+
+      <div class="actions-row">
+        <button
+          type="button"
+          data-vote-btn
+          data-vote-slug={photo.data.slug}
+          class="vote-btn"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          Voter
+        </button>
+        <span class="vote-display">
+          <strong data-vote-count data-vote-slug={photo.data.slug}>0</strong> vote(s)
+        </span>
+        {photo.data.for_sale && (
+          <span class="for-sale">
+            {photo.data.price ? `${photo.data.price} € — tirage` : 'Tirage sur demande'}
+          </span>
+        )}
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-item">
+          <span class="meta-label">Date</span>
+          <span class="meta-value">{photo.data.date.toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+        </div>
+        {photo.data.series && (
+          <div class="meta-item">
+            <span class="meta-label">Série</span>
+            <a href={`/series/${photo.data.series}/`} class="meta-value meta-link">
+              {photo.data.series.replace(/-/g, ' ')}
+            </a>
+          </div>
+        )}
+      </div>
+
+      {photo.data.tags.length > 0 && (
+        <div class="tags-row">
+          {photo.data.tags.map((tag) => (
+            <a href={`/photos?tag=${tag}`} class="tag">#{tag}</a>
+          ))}
+        </div>
+      )}
+
+      {exifFields.length > 0 && (
+        <div class="exif-block">
+          <p class="exif-heading">Données EXIF</p>
+          <dl class="exif-grid">
+            {exifFields.map((field) => (
+              <>
+                <dt>{field.label}</dt>
+                <dd>{field.value}</dd>
+              </>
+            ))}
+          </dl>
+        </div>
+      )}
+
+    </div>
+
+    <nav class="photo-nav">
+      {prev ? (
+        <a href={`/photo/${prev.data.slug}/`} class="photo-nav-item photo-nav-prev">
+          <img src={prev.data.url} alt={prev.data.title} />
+          <div class="photo-nav-label">
+            <span>← Précédente</span>
+            <strong>{prev.data.title}</strong>
+          </div>
+        </a>
+      ) : <span />}
+      {next ? (
+        <a href={`/photo/${next.data.slug}/`} class="photo-nav-item photo-nav-next">
+          <div class="photo-nav-label photo-nav-label--right">
+            <span>Suivante →</span>
+            <strong>{next.data.title}</strong>
+          </div>
+          <img src={next.data.url} alt={next.data.title} />
+        </a>
+      ) : <span />}
+    </nav>
+
+  </article>
+</Base>
+
+<style>
+  .photo-detail {
+    display: grid;
+    gap: 2rem;
+  }
+
+  /* Image */
+  .image-frame {
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    max-height: 80vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .image-frame img {
+    width: 100%;
+    max-height: 80vh;
+    object-fit: contain;
+    display: block;
+  }
+
+  /* Body */
+  .detail-body {
+    display: grid;
+    gap: 1.4rem;
+    max-width: 68ch;
+  }
+
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .breadcrumb span {
+    opacity: 0.5;
+  }
+
+  .breadcrumb a:hover {
+    color: var(--text);
+  }
+
+  .detail-header {
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .detail-header h1 {
+    font-size: clamp(1.8rem, 4vw, 3rem);
+  }
+
+  .description {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.65;
+  }
+
+  /* Actions */
+  .actions-row {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+  }
+
+  .vote-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--line);
+    background: rgba(116, 143, 255, 0.08);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 0.45rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: background 200ms ease, border-color 200ms ease;
+  }
+
+  .vote-btn:hover {
+    background: rgba(116, 143, 255, 0.2);
+    border-color: var(--accent);
+  }
+
+  .vote-btn:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+
+  .vote-display {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .for-sale {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--accent);
+    border: 1px solid rgba(116, 143, 255, 0.35);
+    border-radius: 999px;
+    padding: 0.3rem 0.75rem;
+  }
+
+  /* Meta grid */
+  .meta-grid {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .meta-item {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .meta-label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  .meta-value {
+    font-size: 0.95rem;
+    color: var(--text);
+  }
+
+  .meta-link:hover {
+    color: var(--accent);
+  }
+
+  /* Tags */
+  .tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .tag {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 0.22rem 0.65rem;
+    transition: color 180ms ease, border-color 180ms ease;
+  }
+
+  .tag:hover {
+    color: var(--text);
+    border-color: var(--muted);
+  }
+
+  /* EXIF */
+  .exif-block {
+    background: rgba(15, 31, 61, 0.6);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+  }
+
+  .exif-heading {
+    margin: 0 0 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .exif-grid {
+    margin: 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.3rem 1.2rem;
+  }
+
+  .exif-grid dt {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .exif-grid dd {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--text);
+  }
+
+  /* Prev / Next navigation */
+  .photo-nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .photo-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: rgba(15, 31, 61, 0.4);
+    transition: background 200ms ease, border-color 200ms ease;
+    overflow: hidden;
+  }
+
+  .photo-nav-item:hover {
+    background: rgba(36, 58, 101, 0.5);
+    border-color: rgba(116, 143, 255, 0.3);
+  }
+
+  .photo-nav-item img {
+    width: 56px;
+    height: 42px;
+    object-fit: cover;
+    border-radius: 0.4rem;
+    flex-shrink: 0;
+  }
+
+  .photo-nav-label {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .photo-nav-label--right {
+    text-align: right;
+    justify-items: end;
+  }
+
+  .photo-nav-label span {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .photo-nav-label strong {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 400;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 20ch;
+  }
+
+  .photo-nav-next {
+    flex-direction: row-reverse;
+  }
+
+  @media (max-width: 680px) {
+    .photo-nav {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

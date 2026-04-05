@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.astro/
+demo-assets/
+public/demo/
+.DS_Store
+*.env
+.env
+.env.local
+.claude/

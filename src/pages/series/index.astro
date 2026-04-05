@@ -1,0 +1,24 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+
+const seriesEntries = await getCollection('series', ({ data }) => data.published);
+---
+
+<Base title="Séries | Portfolio" description="Séries photo publiées">
+  <h1 style="margin-bottom:1rem;">Séries</h1>
+  <section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
+    {seriesEntries.map((series) => (
+      <a
+        href={`/series/${series.data.slug}/`}
+        style="background:var(--surface);border-radius:0.8rem;overflow:hidden;display:block;"
+      >
+        <img src={series.data.cover_url} alt={series.data.name} loading="lazy" style="width:100%;height:220px;object-fit:cover;display:block;" />
+        <div style="padding:0.85rem;display:grid;gap:0.45rem;">
+          <h2 style="font-size:1.05rem;">{series.data.name}</h2>
+          <p style="margin:0;">{series.data.description}</p>
+        </div>
+      </a>
+    ))}
+  </section>
+</Base>

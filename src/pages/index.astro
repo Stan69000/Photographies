@@ -1,0 +1,307 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+
+const allSeries = await getCollection('series', ({ data }) => data.published);
+const allPhotos = await getCollection('photos');
+
+const featured = allPhotos
+  .slice()
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())[0];
+
+const cards = allSeries
+  .map((series) => {
+    const photos = allPhotos.filter((photo) => photo.data.series === series.data.slug);
+    const tagStats = new Map<string, number>();
+
+    for (const photo of photos) {
+      for (const tag of photo.data.tags ?? []) {
+        const key = tag.trim();
+        if (!key) continue;
+        tagStats.set(key, (tagStats.get(key) ?? 0) + 1);
+      }
+    }
+
+    const topTags = [...tagStats.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([tag]) => tag);
+
+    return {
+      slug: series.data.slug,
+      name: series.data.name,
+      description: series.data.description,
+      cover: series.data.cover_url,
+      count: photos.length,
+      topTags
+    };
+  })
+  .filter((item) => item.count > 0)
+  .sort((a, b) => b.count - a.count);
+---
+
+<Base title="Portfolio | Accueil" description="Galerie photo personnelle de Stan">
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="kicker">Stan Bouchet · Galerie personnelle</p>
+      <h1>Bonjour, moi c'est Stan.</h1>
+      <p>
+        Je suis photographe amateur et je partage ici mes images, sans prétention,
+        avec l’envie de construire des séries cohérentes et sensibles.
+      </p>
+      <p>
+        Tu peux explorer par série, rechercher par tags, et voter anonymement
+        (1 vote max par photo et par personne).
+      </p>
+      <div class="hero-actions">
+        <a href="/photos">Explorer les photos</a>
+        <a href="/series">Voir les séries</a>
+      </div>
+    </div>
+
+    {featured && (
+      <a href={`/photo/${featured.data.slug}/`} class="hero-image">
+        <img src={featured.data.url} alt={featured.data.title} loading="eager" decoding="async" />
+        <div class="caption">
+          <span>Dernière image</span>
+          <strong>{featured.data.title}</strong>
+        </div>
+      </a>
+    )}
+  </section>
+
+  <section class="series-head">
+    <h2>Séries</h2>
+    <p>Des ensembles d’images pensés comme des mini-récits visuels.</p>
+  </section>
+
+  <section class="series-grid">
+    {cards.map((card) => (
+      <a href={`/series/${card.slug}/`} class="series-card">
+        <img src={card.cover} alt={card.name} loading="lazy" decoding="async" />
+        <div class="overlay">
+          <h3>{card.name}</h3>
+          <p>{card.description}</p>
+          <div class="meta">
+            <span>{card.count} images</span>
+            {card.topTags.length > 0 && <span>{card.topTags.join(' · ')}</span>}
+          </div>
+        </div>
+      </a>
+    ))}
+  </section>
+</Base>
+
+<style>
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: 1rem;
+    margin-bottom: 1.6rem;
+    align-items: stretch;
+  }
+
+  .hero-copy {
+    display: grid;
+    gap: 0.8rem;
+    background: linear-gradient(145deg, rgba(14, 30, 61, 0.95), rgba(7, 18, 41, 0.95));
+    border: 1px solid var(--line);
+    border-radius: 0.9rem;
+    padding: 1rem;
+    align-content: start;
+  }
+
+  .kicker {
+    margin: 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    color: #bdd2fb;
+    text-transform: uppercase;
+  }
+
+  .hero-copy h1 {
+    margin: 0;
+    font-size: clamp(2rem, 4.2vw, 3.1rem);
+    line-height: 1.06;
+  }
+
+  .hero-copy p {
+    margin: 0;
+    line-height: 1.6;
+  }
+
+  .hero-actions {
+    margin-top: 0.3rem;
+    display: flex;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+  }
+
+  .hero-actions a {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    font-family: 'IBM Plex Mono', monospace;
+    background: rgba(8, 20, 44, 0.75);
+  }
+
+  .hero-image {
+    position: relative;
+    border-radius: 0.9rem;
+    overflow: hidden;
+    min-height: 300px;
+    max-height: 380px;
+    border: 1px solid var(--line);
+    display: block;
+  }
+
+  .hero-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 40%;
+    display: block;
+    transition: transform 350ms ease;
+  }
+
+  .hero-image::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.12) 30%, rgba(0, 0, 0, 0.7) 100%);
+    z-index: 1;
+  }
+
+  .caption {
+    position: absolute;
+    z-index: 2;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0.8rem;
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .caption span {
+    font-size: 0.76rem;
+    font-family: 'IBM Plex Mono', monospace;
+    color: #b9cef8;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .caption strong {
+    font-size: 1.05rem;
+    color: #f2f7ff;
+  }
+
+  .hero-image:hover img {
+    transform: scale(1.03);
+  }
+
+  .series-head {
+    display: grid;
+    gap: 0.35rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .series-head h2,
+  .series-head p {
+    margin: 0;
+  }
+
+  .series-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .series-card {
+    grid-column: span 6;
+    position: relative;
+    border-radius: 0.9rem;
+    overflow: hidden;
+    min-height: 290px;
+    border: 1px solid var(--line);
+    display: block;
+  }
+
+  .series-card:nth-child(3n) {
+    grid-column: span 6;
+    min-height: 290px;
+  }
+
+  .series-card img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 300ms ease;
+  }
+
+  .series-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.12) 25%, rgba(0, 0, 0, 0.76) 100%);
+    z-index: 1;
+  }
+
+  .overlay {
+    position: absolute;
+    inset: auto 0 0;
+    z-index: 2;
+    padding: 0.9rem;
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .overlay h3,
+  .overlay p {
+    margin: 0;
+  }
+
+  .overlay p {
+    color: #dbe6fb;
+    max-width: 65ch;
+  }
+
+  .meta {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+  }
+
+  .meta span {
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+  }
+
+  .series-card:hover img {
+    transform: scale(1.025);
+  }
+
+  @media (max-width: 980px) {
+    .hero {
+      grid-template-columns: 1fr;
+    }
+
+    .hero-image {
+      min-height: 260px;
+      max-height: 320px;
+    }
+
+    .series-card,
+    .series-card:nth-child(3n) {
+      grid-column: span 12;
+      min-height: 270px;
+    }
+  }
+</style>

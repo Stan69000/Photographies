@@ -1,0 +1,400 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import Lightbox from '../../components/Lightbox.astro';
+
+const seriesCollection = await getCollection('series');
+const seriesBySlug = new Map(seriesCollection.map((item) => [item.data.slug, item.data.name]));
+
+const photos = (await getCollection('photos'))
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
+  .map((photo) => ({
+    slug: photo.data.slug,
+    title: photo.data.title,
+    series: photo.data.series,
+    seriesName: seriesBySlug.get(photo.data.series) ?? photo.data.series,
+    url: photo.data.url,
+    description: photo.data.description,
+    tags: photo.data.tags ?? [],
+    rating: photo.data.rating ?? 0,
+    timestamp: photo.data.date.getTime()
+  }));
+
+const seriesList = [...new Set(photos.map((photo) => photo.seriesName))].sort();
+const tagsList = [...new Set(photos.flatMap((photo) => photo.tags))].sort((a, b) => a.localeCompare(b, 'fr'));
+---
+
+<Base title="Photos | Portfolio" description="Recherche photos par titre, série et tag">
+
+  <section class="page-header reveal">
+    <h1>Photos</h1>
+    <p>Filtrez par série, tag ou titre. Votez, ajoutez en favoris.</p>
+  </section>
+
+  <section class="filters reveal">
+    <label>
+      <span>Recherche</span>
+      <input id="search-query" type="search" placeholder="Titre, tag, série..." />
+    </label>
+
+    <label>
+      <span>Série</span>
+      <select id="search-series">
+        <option value="">Toutes</option>
+        {seriesList.map((series) => (
+          <option value={series.toLowerCase()}>{series}</option>
+        ))}
+      </select>
+    </label>
+
+    <label>
+      <span>Tag</span>
+      <select id="search-tag">
+        <option value="">Tous</option>
+        {tagsList.map((tag) => (
+          <option value={tag}>{tag}</option>
+        ))}
+      </select>
+    </label>
+
+    <label>
+      <span>Trier par</span>
+      <select id="search-sort">
+        <option value="newest">Plus récentes</option>
+        <option value="votes">Plus votées</option>
+        <option value="rating">Mieux notées</option>
+        <option value="title">Titre A → Z</option>
+      </select>
+    </label>
+
+    <label class="fav-only">
+      <input id="only-favorites" type="checkbox" />
+      <span>Favoris</span>
+    </label>
+  </section>
+
+  <p id="search-count" class="result-count"></p>
+
+  <section id="search-results" class="results-grid">
+    {photos.map((photo, index) => (
+      <article
+        class="result-card reveal"
+        data-slug={photo.slug}
+        data-search={photo.title.toLowerCase()}
+        data-title={photo.title.toLowerCase()}
+        data-series={photo.seriesName.toLowerCase()}
+        data-tags={photo.tags.join(' ').toLowerCase()}
+        data-rating={photo.rating}
+        data-timestamp={photo.timestamp}
+      >
+        <button
+          type="button"
+          class="card-img-btn"
+          data-lightbox-index={index}
+          aria-label={`Ouvrir ${photo.title}`}
+        >
+          <img
+            src={photo.url}
+            alt={photo.title}
+            loading="lazy"
+            decoding="async"
+            style={`view-transition-name: photo-${photo.slug};`}
+          />
+          <div class="card-hover-overlay">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+          </div>
+        </button>
+        <div class="card-body">
+          <a href={`/photo/${photo.slug}/`} class="card-title">{photo.title}</a>
+          <p class="card-series">{photo.seriesName}</p>
+          <div class="tools-row">
+            <button type="button" class="tool-btn" data-vote-btn data-vote-slug={photo.slug}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              <strong data-vote-count data-vote-slug={photo.slug}>0</strong>
+            </button>
+            <button type="button" class="tool-btn" data-fav-btn data-fav-slug={photo.slug}>☆</button>
+          </div>
+        </div>
+      </article>
+    ))}
+  </section>
+
+  <Lightbox photos={photos} />
+</Base>
+
+<style>
+  .page-header {
+    margin-bottom: 1.4rem;
+  }
+
+  .page-header p {
+    margin: 0.3rem 0 0;
+  }
+
+  .filters {
+    display: grid;
+    grid-template-columns: 1.6fr repeat(3, 1fr) auto;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    align-items: end;
+  }
+
+  .filters label {
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .filters label span {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+  }
+
+  .filters input,
+  .filters select {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.55rem;
+    border: 1px solid var(--line);
+    background: rgba(6, 16, 36, 0.9);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 0.88rem;
+    transition: border-color 200ms ease;
+  }
+
+  .filters input:focus,
+  .filters select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .fav-only {
+    grid-auto-flow: column;
+    justify-content: start;
+    align-items: center;
+    gap: 0.4rem;
+    padding-bottom: 0.1rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .fav-only input {
+    width: auto;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--accent);
+  }
+
+  .result-count {
+    margin: 0.6rem 0 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+
+  .result-card {
+    background: linear-gradient(160deg, rgba(14, 30, 62, 0.85), rgba(9, 20, 43, 0.85));
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--line);
+    transition: border-color 200ms ease, transform 200ms ease;
+  }
+
+  .result-card:hover {
+    border-color: rgba(116, 143, 255, 0.3);
+    transform: translateY(-2px);
+  }
+
+  .card-img-btn {
+    display: block;
+    width: 100%;
+    border: 0;
+    padding: 0;
+    background: none;
+    cursor: zoom-in;
+    position: relative;
+  }
+
+  .card-img-btn img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    display: block;
+    transition: transform 320ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .card-hover-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.35);
+    color: #fff;
+    opacity: 0;
+    transition: opacity 220ms ease;
+  }
+
+  .card-img-btn:hover .card-hover-overlay {
+    opacity: 1;
+  }
+
+  .card-img-btn:hover img {
+    transform: scale(1.04);
+  }
+
+  .card-body {
+    padding: 0.7rem 0.85rem 0.85rem;
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .card-title {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--text);
+    line-height: 1.2;
+  }
+
+  .card-title:hover {
+    color: var(--accent);
+  }
+
+  .card-series {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .tools-row {
+    margin-top: 0.35rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .tool-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 0.22rem 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+  }
+
+  .tool-btn:hover {
+    color: var(--text);
+    border-color: var(--muted);
+  }
+
+  .tool-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  @media (max-width: 980px) {
+    .filters {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 620px) {
+    .filters {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script is:inline>
+  const qInput = document.querySelector('#search-query');
+  const sSelect = document.querySelector('#search-series');
+  const tSelect = document.querySelector('#search-tag');
+  const sortSelect = document.querySelector('#search-sort');
+  const onlyFav = document.querySelector('#only-favorites');
+  const grid = document.querySelector('#search-results');
+  const cards = Array.from(document.querySelectorAll('.result-card'));
+  const count = document.querySelector('#search-count');
+
+  const normalize = (v) => (v || '').trim().toLowerCase();
+
+  const getVoteScore = (slug) => {
+    if (!window.PhotoVotes) return 0;
+    return Number(window.PhotoVotes.getScore(slug) || 0);
+  };
+
+  const runFilter = () => {
+    const query = normalize(qInput?.value);
+    const series = normalize(sSelect?.value);
+    const tag = normalize(tSelect?.value);
+    const sortBy = sortSelect?.value || 'newest';
+    const favOnly = Boolean(onlyFav?.checked);
+
+    let visibleCards = [];
+
+    for (const card of cards) {
+      const slug = card.dataset.slug || '';
+      const hayTitle = card.dataset.search || '';
+      const haySeries = card.dataset.series || '';
+      const hayTags = card.dataset.tags || '';
+
+      const textMatch = !query || hayTitle.includes(query) || haySeries.includes(query) || hayTags.includes(query);
+      const seriesMatch = !series || haySeries === series;
+      const tagMatch = !tag || hayTags.split(' ').includes(tag);
+      const favMatch = !favOnly || (window.PhotoVotes && window.PhotoVotes.isFavorite(slug));
+
+      const show = textMatch && seriesMatch && tagMatch && favMatch;
+      card.style.display = show ? '' : 'none';
+      if (show) visibleCards.push(card);
+    }
+
+    visibleCards.sort((a, b) => {
+      if (sortBy === 'title') {
+        return (a.dataset.title || '').localeCompare(b.dataset.title || '', 'fr');
+      }
+      if (sortBy === 'rating') {
+        return Number(b.dataset.rating || 0) - Number(a.dataset.rating || 0);
+      }
+      if (sortBy === 'votes') {
+        return getVoteScore(b.dataset.slug || '') - getVoteScore(a.dataset.slug || '');
+      }
+      return Number(b.dataset.timestamp || 0) - Number(a.dataset.timestamp || 0);
+    });
+
+    for (const card of visibleCards) {
+      grid?.appendChild(card);
+    }
+
+    if (count) {
+      const n = visibleCards.length;
+      count.textContent = `${n} résultat${n > 1 ? 's' : ''}`;
+    }
+  };
+
+  qInput?.addEventListener('input', runFilter);
+  sSelect?.addEventListener('change', runFilter);
+  tSelect?.addEventListener('change', runFilter);
+  sortSelect?.addEventListener('change', runFilter);
+  onlyFav?.addEventListener('change', runFilter);
+  window.addEventListener('photo-votes:changed', runFilter);
+  window.addEventListener('photo-favorites:changed', runFilter);
+
+  runFilter();
+</script>

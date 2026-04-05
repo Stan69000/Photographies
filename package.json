@@ -1,0 +1,22 @@
+{
+  "name": "portfolio-photo-stan",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "admin": "node admin-server.js",
+    "build": "astro build",
+    "preview": "astro preview",
+    "process:photos": "node scripts/process-photos.js"
+  },
+  "dependencies": {
+    "astro": "^5.7.0",
+    "sharp": "^0.34.0",
+    "stripe": "^18.3.0"
+  },
+  "devDependencies": {
+    "decap-server": "^3.6.0",
+    "typescript": "^5.9.0"
+  }
+}

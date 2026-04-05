@@ -1,0 +1,276 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import Lightbox from '../../components/Lightbox.astro';
+
+export async function getStaticPaths() {
+  const seriesEntries = await getCollection('series', ({ data }) => data.published);
+  return seriesEntries.map((series) => ({
+    params: { slug: series.data.slug },
+    props: { series }
+  }));
+}
+
+const { series } = Astro.props;
+const photos = (await getCollection('photos'))
+  .filter((photo) => photo.data.series === series.data.slug)
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
+  .map((photo) => ({
+    id: photo.id,
+    slug: photo.data.slug,
+    title: photo.data.title,
+    description: photo.data.description,
+    url: photo.data.url,
+    tags: photo.data.tags ?? []
+  }));
+
+const allTags = [...new Set(photos.flatMap((p) => p.tags))].slice(0, 10);
+const hero = photos[0];
+---
+
+<Base title={`${series.data.name} | Portfolio`} description={series.data.description}>
+  <section class="hero reveal">
+    {hero && (
+      <button
+        type="button"
+        class="hero-image"
+        data-lightbox-index="0"
+        aria-label={`Ouvrir ${hero.title} en plein écran`}
+      >
+        <img src={hero.url} alt={hero.title} loading="eager" decoding="async" style={`view-transition-name: photo-${hero.slug};`} />
+      </button>
+    )}
+    <div class="hero-copy">
+      <a href="/series" class="back">← Toutes les séries</a>
+      <h1>{series.data.name}</h1>
+      <p>{series.data.description}</p>
+      <div class="series-stats">
+        <span>{photos.length} photographie{photos.length > 1 ? 's' : ''}</span>
+      </div>
+      {allTags.length > 0 && (
+        <div class="tags">
+          {allTags.map((tag) => (
+            <span>#{tag}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  </section>
+
+  <section class="mosaic">
+    {photos.map((photo, index) => (
+      <button
+        type="button"
+        class={`tile ${index % 7 === 0 ? 'large' : ''} reveal`}
+        data-lightbox-index={index}
+        aria-label={`Ouvrir ${photo.title} en plein écran`}
+        style={`animation-delay: ${Math.min(index * 40, 400)}ms`}
+      >
+        <img src={photo.url} alt={photo.title} loading="lazy" decoding="async" style={`view-transition-name: photo-${photo.slug};`} />
+        <div class="caption">
+          <strong>{photo.title}</strong>
+          {photo.description && <span>{photo.description}</span>}
+        </div>
+      </button>
+    ))}
+  </section>
+
+  <Lightbox photos={photos} />
+</Base>
+
+<style>
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    align-items: start;
+  }
+
+  .hero-image {
+    display: block;
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--line);
+    padding: 0;
+    background: var(--surface);
+    cursor: zoom-in;
+    position: relative;
+  }
+
+  .hero-image img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 30%;
+    display: block;
+    transition: transform 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hero-image:hover img {
+    transform: scale(1.03);
+  }
+
+  .hero-copy {
+    background: linear-gradient(150deg, rgba(15, 33, 67, 0.95), rgba(8, 19, 41, 0.95));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.4rem;
+    display: grid;
+    align-content: start;
+    gap: 0.85rem;
+  }
+
+  .back {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--muted);
+    transition: color 180ms ease;
+  }
+
+  .back:hover {
+    color: var(--text);
+  }
+
+  .hero-copy h1 {
+    font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  }
+
+  .hero-copy p {
+    margin: 0;
+  }
+
+  .series-stats {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .tags span {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: #c9dbff;
+  }
+
+  .mosaic {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .tile {
+    grid-column: span 4;
+    position: relative;
+    border-radius: 0.8rem;
+    overflow: hidden;
+    min-height: 280px;
+    border: 1px solid var(--line);
+    display: block;
+    padding: 0;
+    background: var(--surface);
+    cursor: zoom-in;
+  }
+
+  .tile.large {
+    grid-column: span 8;
+    min-height: 380px;
+  }
+
+  .tile img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 320ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .tile::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.04) 35%, rgba(0, 0, 0, 0.76) 100%);
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 280ms ease;
+  }
+
+  .tile:hover::before {
+    opacity: 1;
+  }
+
+  .caption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    padding: 0.85rem;
+    display: grid;
+    gap: 0.2rem;
+    transform: translateY(6px);
+    opacity: 0;
+    transition: transform 280ms cubic-bezier(0.4, 0, 0.2, 1), opacity 280ms ease;
+  }
+
+  .tile:hover .caption {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  .tile:hover img {
+    transform: scale(1.04);
+  }
+
+  .caption strong {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 400;
+    color: #eef5ff;
+  }
+
+  .caption span {
+    font-size: 0.82rem;
+    color: rgba(197, 215, 251, 0.9);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  @media (max-width: 980px) {
+    .hero {
+      grid-template-columns: 1fr;
+    }
+
+    .hero-image {
+      min-height: 300px;
+    }
+
+    .tile,
+    .tile.large {
+      grid-column: span 12;
+      min-height: 260px;
+    }
+  }
+
+  @media (max-width: 620px) {
+    .tile,
+    .tile.large {
+      min-height: 220px;
+    }
+  }
+</style>
